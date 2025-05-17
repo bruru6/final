@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>签章图片列表</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .seal-list-box { max-width: 900px; margin: 40px auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 12px #eee; padding: 32px; }
+        h2 { color: #1677ff; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+        th, td { border: 1px solid #eee; padding: 10px 8px; text-align: center; }
+        th { background: #f7f8fa; color: #1677ff; }
+        img { max-width: 80px; max-height: 80px; border-radius: 6px; border: 1px solid #eee; }
+        .back-link { display: block; margin-top: 18px; text-align: center; color: #888; }
+    </style>
+</head>
+<body>
+<div class="seal-list-box">
+    <h2>我的签章图片</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>图片</th>
+                <th>图片哈希</th>
+                <th>文件位置</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        {{range .Seals}}
+            <tr>
+                <td><img src="/{{.Location}}" alt="seal"></td>
+                <td>{{.ImageHash}}</td>
+                <td>{{.Location}}</td>
+                <td>
+                    <form method="post" action="/seal/delete" style="display:inline;">
+                        <input type="hidden" name="seal_id" value="{{.SealID}}">
+                        <input type="submit" value="删除" onclick="return confirm('确定要删除该图片吗？');">
+                    </form>
+                </td>
+            </tr>
+        {{else}}
+            <tr><td colspan="4">暂无签章图片</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    <a class="back-link" href="/">返回首页</a>
+</div>
+</body>
+</html>

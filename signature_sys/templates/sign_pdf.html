@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>PDF文档签章</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .sign-box { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 12px #eee; padding: 32px; }
+        h2 { color: #1677ff; text-align: center; }
+        form { display: flex; flex-direction: column; gap: 18px; }
+        select, input[type="number"], input[type="text"] { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        input[type="submit"] { background: #1677ff; color: #fff; border: none; border-radius: 4px; padding: 10px 0; font-size: 16px; cursor: pointer; }
+        input[type="submit"]:hover { background: #135ecb; }
+        .back-link { display: block; margin-top: 18px; text-align: center; color: #888; }
+    </style>
+</head>
+<body>
+<div class="sign-box">
+    <h2>PDF文档签章</h2>
+    <form id="signForm" method="post" action="/sign/pdf">
+        <label>选择文档：
+            <select name="doc_id" id="doc_id" required onchange="previewPDF()">
+                {{range .Docs}}
+                <option value="{{.DocID}}" data-path="/{{.Location}}">{{.Location}}</option>
+                {{end}}
+            </select>
+        </label>
+        <label>选择签章图片：
+            <select name="seal_id" id="seal_id" required onchange="previewSeal()">
+                {{range .Seals}}
+                <option value="{{.SealID}}" data-path="/{{.Location}}">{{.Location}}</option>
+                {{end}}
+            </select>
+        </label>
+        <label>X坐标：<input type="number" name="pos_x" id="pos_x" step="0.1" value="0" required oninput="previewSign()"></label>
+        <label>Y坐标：<input type="number" name="pos_y" id="pos_y" step="0.1" value="0" required oninput="previewSign()"></label>
+        <label>缩放比例(0.2-2.0)：<input type="number" name="scale" id="scale" min="0.2" max="2.0" step="0.01" value="1.0" required oninput="previewSign()"></label>
+        <label>旋转角度(0-360)：<input type="number" name="rotation" id="rotation" min="0" max="360" step="1" value="0" required oninput="previewSign()"></label>
+        <label>PIN码：<input type="password" name="pin" required></label>
+        <input type="submit" value="签章">
+    </form>
+    <div style="display:flex;gap:32px;margin-top:32px;align-items:flex-start;">
+        <div style="flex:2;">
+            <iframe id="pdfPreview" src="" width="400" height="500" style="border:1px solid #eee;"></iframe>
+        </div>
+        <div style="flex:1;">
+            <div>签章图片预览：</div>
+            <img id="sealPreview" src="" style="max-width:120px;max-height:120px;border:1px solid #eee;">
+        </div>
+    </div>
+    <script>
+    function previewPDF() {
+        var sel = document.getElementById('doc_id');
+        var opt = sel.options[sel.selectedIndex];
+        document.getElementById('pdfPreview').src = opt.getAttribute('data-path');
+        previewSign();
+    }
+    function previewSeal() {
+        var sel = document.getElementById('seal_id');
+        var opt = sel.options[sel.selectedIndex];
+        document.getElementById('sealPreview').src = opt.getAttribute('data-path');
+        previewSign();
+    }
+    function previewSign() {
+        var doc_id = document.getElementById('doc_id').value;
+        var seal_id = document.getElementById('seal_id').value;
+        var pos_x = document.getElementById('pos_x').value;
+        var pos_y = document.getElementById('pos_y').value;
+        var scale = document.getElementById('scale').value;
+        var rotation = document.getElementById('rotation').value;
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/sign/preview', true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.onreadystatechange = function() {
+            if(xhr.readyState==4 && xhr.status==200) {
+                try {
+                    var res = JSON.parse(xhr.responseText);
+                    document.getElementById('pdfPreview').src = res.preview_url;
+                } catch(e) {}
+            }
+        };
+        var params = 'doc_id='+encodeURIComponent(doc_id)+'&seal_id='+encodeURIComponent(seal_id)+'&pos_x='+pos_x+'&pos_y='+pos_y+'&scale='+scale+'&rotation='+rotation;
+        xhr.send(params);
+    }
+    window.onload = function() {
+        previewPDF();
+        previewSeal();
+    }
+    </script>
+    <a class="back-link" href="/">返回首页</a>
+</div>
+</body>
+</html>

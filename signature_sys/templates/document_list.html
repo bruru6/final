@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>文档列表</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .doc-list-box { max-width: 900px; margin: 40px auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 12px #eee; padding: 32px; }
+        h2 { color: #1677ff; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+        th, td { border: 1px solid #eee; padding: 10px 8px; text-align: center; }
+        th { background: #f7f8fa; color: #1677ff; }
+        .back-link { display: block; margin-top: 18px; text-align: center; color: #888; }
+    </style>
+</head>
+<body>
+<div class="doc-list-box">
+    <h2>我的PDF文档</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>文档ID</th>
+                <th>哈希值</th>
+                <th>文件位置</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+        {{range .Docs}}
+            <tr>
+                <td>{{.DocID}}</td>
+                <td>{{.FileHash}}</td>
+                <td>{{.Location}}</td>
+                <td>
+                    <form method="post" action="/document/delete" style="display:inline;">
+                        <input type="hidden" name="doc_id" value="{{.DocID}}">
+                        <input type="submit" value="删除" onclick="return confirm('确定要删除该文档吗？');">
+                    </form>
+                </td>
+            </tr>
+        {{else}}
+            <tr><td colspan="4">暂无文档</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+    <a class="back-link" href="/">返回首页</a>
+</div>
+</body>
+</html>

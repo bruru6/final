@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>电子签章系统首页</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { background: #f7f8fa; font-family: 'Microsoft YaHei', Arial, sans-serif; }
+        .container { max-width: 1100px; margin: 40px auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 12px #eee; padding: 32px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+        .header h2 { margin: 0; }
+        .nav { margin-bottom: 24px; }
+        .nav a { margin-right: 24px; color: #1677ff; text-decoration: none; font-weight: bold; }
+        .nav a:hover { text-decoration: underline; }
+        .welcome { font-size: 18px; color: #333; margin-bottom: 16px; }
+        .card-list { display: flex; gap: 32px; }
+        .card { background: #fafbfc; border-radius: 8px; box-shadow: 0 1px 4px #eee; padding: 24px; flex: 1; min-width: 260px; }
+        .card h3 { margin-top: 0; font-size: 20px; color: #1677ff; }
+        .card ul { padding-left: 18px; }
+        .card li { margin-bottom: 8px; }
+        .login-tip { color: #888; font-size: 16px; margin-top: 32px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h2>电子签章系统</h2>
+        <div class="nav">
+            {{if .IsLogin}}
+                <a href="/">首页</a>
+                <!-- <a href="/seal/upload">上传签章图片</a> -->
+                <a href="/logout">退出登录</a>
+            {{else}}
+                <a href="/login">登录</a>
+                <a href="/register">注册</a>
+            {{end}}
+        </div>
+    </div>
+    {{if .IsLogin}}
+        <div class="welcome">欢迎，{{.Username}}！请选择功能：</div>
+        <div class="card-list">
+            <div class="card">
+                <h3>签章管理</h3>
+                <ul>
+                    <li><a href="/seal/upload">上传签章图片</a></li>
+                    <li><a href="/seal/list">签章图片列表</a></li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3>文档签章</h3>
+                <ul>
+                    <li><a href="/document/upload">上传PDF文档</a></li>
+                    <li><a href="/document/list">文档列表</a></li>
+                    <li><a href="/sign/pdf/form">发起签章</a></li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3>签章验证</h3>
+                <ul>
+                    <li><a href="/verify/pdf">验证签章</a></li>
+                </ul>
+            </div>
+        </div>
+    {{else}}
+        <div class="login-tip">请先登录后使用主要功能。</div>
+    {{end}}
+</div>
+</body>
+</html>

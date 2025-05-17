@@ -1,0 +1,67 @@
+/* 电子签章系统全局样式，可根据需要扩展 */
+body {
+    background: #f7f8fa;
+    font-family: 'Microsoft YaHei', Arial, sans-serif;
+}
+.container {
+    max-width: 1100px;
+    margin: 40px auto;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px #eee;
+    padding: 32px;
+}
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+}
+.header h2 {
+    margin: 0;
+}
+.nav {
+    margin-bottom: 24px;
+}
+.nav a {
+    margin-right: 24px;
+    color: #1677ff;
+    text-decoration: none;
+    font-weight: bold;
+}
+.nav a:hover {
+    text-decoration: underline;
+}
+.welcome {
+    font-size: 18px;
+    color: #333;
+    margin-bottom: 16px;
+}
+.card-list {
+    display: flex;
+    gap: 32px;
+}
+.card {
+    background: #fafbfc;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px #eee;
+    padding: 24px;
+    flex: 1;
+    min-width: 260px;
+}
+.card h3 {
+    margin-top: 0;
+    font-size: 20px;
+    color: #1677ff;
+}
+.card ul {
+    padding-left: 18px;
+}
+.card li {
+    margin-bottom: 8px;
+}
+.login-tip {
+    color: #888;
+    font-size: 16px;
+    margin-top: 32px;
+}
