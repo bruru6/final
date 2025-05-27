@@ -5,89 +5,312 @@
     <title>PDF文档签章</title>
     <link rel="stylesheet" href="/static/style.css">
     <style>
-        .sign-box { max-width: 600px; margin: 40px auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 12px #eee; padding: 32px; }
-        h2 { color: #1677ff; text-align: center; }
-        form { display: flex; flex-direction: column; gap: 18px; }
-        select, input[type="number"], input[type="text"] { padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
-        input[type="submit"] { background: #1677ff; color: #fff; border: none; border-radius: 4px; padding: 10px 0; font-size: 16px; cursor: pointer; }
-        input[type="submit"]:hover { background: #135ecb; }
-        .back-link { display: block; margin-top: 18px; text-align: center; color: #888; }
+        body { background: #f7f8fa; }
+        .sign-layout { display: flex; max-width: 1200px; margin: 32px auto; gap: 32px; }
+        .side-panel { width: 240px; display: flex; flex-direction: column; gap: 24px; }
+        .seal-preview-box { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px #eee; padding: 18px; text-align: center; }
+        .seal-preview-box img { max-width: 180px; max-height: 180px; border: 1px solid #eee; }
+        .param-panel { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px #eee; padding: 18px; font-size: 15px; }
+        .param-panel label { font-weight: bold; }
+        .param-row { margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .param-value { font-family: monospace; background: #f8fafc; border-radius: 4px; padding: 2px 6px; }
+        .param-lock { margin-left: 8px; cursor: pointer; color: #1677ff; }
+        .main-panel { flex: 1; }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .toolbar button {
+            flex: 1;
+            text-align: center;
+        }
+        .pdf-canvas-box { position: relative; width: 520px; height: 700px; background: #f8fafc; border: 1px solid #eee; margin: 0 auto; }
+        #pdf-canvas { width: 100%; height: 100%; background: #fff; }
+        #seal-draggable {
+            position: absolute; left: 40px; top: 500px; width: 120px; height: 120px; cursor: move; z-index: 10;
+            transform-origin: center center;
+        }
+        #seal-draggable img { width: 100%; height: 100%; pointer-events: none; user-select: none; }
+        .rotate-btn { position: absolute; right: -18px; top: -18px; width: 32px; height: 32px; background: #1677ff; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; z-index: 20; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
 <body>
-<div class="sign-box">
-    <h2>PDF文档签章</h2>
-    <form id="signForm" method="post" action="/sign/pdf">
-        <label>选择文档：
-            <select name="doc_id" id="doc_id" required onchange="previewPDF()">
-                {{range .Docs}}
-                <option value="{{.DocID}}" data-path="/{{.Location}}">{{.Location}}</option>
-                {{end}}
-            </select>
-        </label>
-        <label>选择签章图片：
-            <select name="seal_id" id="seal_id" required onchange="previewSeal()">
-                {{range .Seals}}
-                <option value="{{.SealID}}" data-path="/{{.Location}}">{{.Location}}</option>
-                {{end}}
-            </select>
-        </label>
-        <label>X坐标：<input type="number" name="pos_x" id="pos_x" step="0.1" value="0" required oninput="previewSign()"></label>
-        <label>Y坐标：<input type="number" name="pos_y" id="pos_y" step="0.1" value="0" required oninput="previewSign()"></label>
-        <label>缩放比例(0.2-2.0)：<input type="number" name="scale" id="scale" min="0.2" max="2.0" step="0.01" value="1.0" required oninput="previewSign()"></label>
-        <label>旋转角度(0-360)：<input type="number" name="rotation" id="rotation" min="0" max="360" step="1" value="0" required oninput="previewSign()"></label>
-        <label>PIN码：<input type="password" name="pin" required></label>
-        <input type="submit" value="签章">
-    </form>
-    <div style="display:flex;gap:32px;margin-top:32px;align-items:flex-start;">
-        <div style="flex:2;">
-            <iframe id="pdfPreview" src="" width="400" height="500" style="border:1px solid #eee;"></iframe>
+<div class="sign-layout">
+    <div class="side-panel">
+        <div class="seal-preview-box">
+            <img id="seal-img-preview" src="" alt="签章图片">
         </div>
-        <div style="flex:1;">
-            <div>签章图片预览：</div>
-            <img id="sealPreview" src="" style="max-width:120px;max-height:120px;border:1px solid #eee;">
+        <div class="param-panel">
+            <div class="param-row"><label>页码:</label> <span class="param-value" id="param-page">1</span></div>
+            <div class="param-row"><label>左下角X:</label> <span class="param-value" id="param-x">0</span></div>
+            <div class="param-row"><label>左下角Y:</label> <span class="param-value" id="param-y">0</span></div>
+            <div class="param-row"><label>宽度:</label> <span class="param-value" id="param-w">120</span></div>
+            <div class="param-row"><label>高度:</label> <span class="param-value" id="param-h">120</span></div>
+            <div class="param-row"><label>旋转:</label> <span class="param-value" id="param-rot">0</span>°</div>
+            <div class="param-row"><label>缩放:</label> <input type="number" id="param-scale-input" min="0.2" max="2" step="0.01" value="1.00" style="width:60px;"> <span style="color:#888;font-size:13px;">(0.2~2.0)</span></div>
         </div>
     </div>
-    <script>
-    function previewPDF() {
-        var sel = document.getElementById('doc_id');
-        var opt = sel.options[sel.selectedIndex];
-        document.getElementById('pdfPreview').src = opt.getAttribute('data-path');
-        previewSign();
-    }
-    function previewSeal() {
-        var sel = document.getElementById('seal_id');
-        var opt = sel.options[sel.selectedIndex];
-        document.getElementById('sealPreview').src = opt.getAttribute('data-path');
-        previewSign();
-    }
-    function previewSign() {
-        var doc_id = document.getElementById('doc_id').value;
-        var seal_id = document.getElementById('seal_id').value;
-        var pos_x = document.getElementById('pos_x').value;
-        var pos_y = document.getElementById('pos_y').value;
-        var scale = document.getElementById('scale').value;
-        var rotation = document.getElementById('rotation').value;
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', '/sign/preview', true);
-        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-        xhr.onreadystatechange = function() {
-            if(xhr.readyState==4 && xhr.status==200) {
-                try {
-                    var res = JSON.parse(xhr.responseText);
-                    document.getElementById('pdfPreview').src = res.preview_url;
-                } catch(e) {}
-            }
-        };
-        var params = 'doc_id='+encodeURIComponent(doc_id)+'&seal_id='+encodeURIComponent(seal_id)+'&pos_x='+pos_x+'&pos_y='+pos_y+'&scale='+scale+'&rotation='+rotation;
-        xhr.send(params);
-    }
-    window.onload = function() {
-        previewPDF();
-        previewSeal();
-    }
-    </script>
-    <a class="back-link" href="/">返回首页</a>
+    <div class="main-panel">
+        <div class="toolbar">
+            <button type="button" id="btn-prev">上一页</button>
+            <button type="button" id="btn-next">下一页</button>
+            <span id="page-info">前往 <span id="cur-page">1</span> / <span id="total-page">1</span> 页</span>
+        </div>
+        <form id="signForm" method="post" action="/sign/pdf" style="margin-bottom:18px;">
+            <table style="width:100%;margin-bottom:10px;">
+                <tr>
+                    <td style="width:25%;">
+                        <label>选择文档：
+                            <select name="doc_id" id="doc_id" required style="width:90%;">
+                                {{range .Docs}}
+                                <option value="{{.DocID}}" data-path="/{{.Location}}">{{.OriginalName}}</option>
+                                {{end}}
+                            </select>
+                        </label>
+                    </td>
+                    <td style="width:25%;">
+                        <label>选择签章图片：
+                            <select name="seal_id" id="seal_id" required style="width:90%;">
+                                {{range .Seals}}
+                                <option value="{{.SealID}}" data-path="/{{.Location}}">{{.Location}}</option>
+                                {{end}}
+                            </select>
+                        </label>
+                    </td>
+                    <td style="width:25%;">
+                        <label>选择证书：
+                            <select name="cert_id" id="cert_id" required style="width:90%;">
+                                {{range .Certs}}
+                                <option value="{{.CertID}}" data-path="/{{.Location}}">{{.Algo}}</option>
+                                {{end}}
+                            </select>
+                        </label>
+                    </td>
+                    <td style="width:25%;">
+                        <label>PIN码：<input type="password" name="pin" required style="width:70%;"></label>
+                        <input type="submit" value="签章" style="margin-left:8px;">
+                    </td>
+                </tr>
+            </table>
+            <input type="hidden" name="scale" id="scale">
+            <input type="hidden" name="rotation" id="rotation">
+            <input type="hidden" name="page" id="page">
+            <input type="hidden" name="pos_x" id="pos_x">
+            <input type="hidden" name="pos_y" id="pos_y">
+        </form>
+        <div class="pdf-canvas-box" id="pdf-canvas-box">
+            <canvas id="pdf-canvas"></canvas>
+            <div id="seal-draggable">
+                <img id="seal-img" src="" alt="签章图片">
+                <div class="rotate-btn" id="rotate-btn" title="旋转">⟳</div>
+            </div>
+        </div>
+    </div>
 </div>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+let pdfDoc = null;
+let pageNum = 1;
+let totalPage = 1;
+let scale = 1.0;
+let pdfWidth = 520, pdfHeight = 700;
+
+function renderPDF(url) {
+    pdfjsLib.getDocument(url).promise.then(function(pdf) {
+        pdfDoc = pdf;
+        totalPage = pdf.numPages;
+        document.getElementById('total-page').innerText = totalPage;
+        goToPage(1);
+    });
+}
+function goToPage(num) {
+    if (!pdfDoc) return;
+    pageNum = Math.max(1, Math.min(num, totalPage));
+    pdfDoc.getPage(pageNum).then(function(page) {
+        let viewport = page.getViewport({ scale: 1.0 });
+        let canvas = document.getElementById('pdf-canvas');
+        let context = canvas.getContext('2d');
+        scale = Math.min(pdfWidth / viewport.width, pdfHeight / viewport.height);
+        let v = page.getViewport({ scale: scale });
+        canvas.width = v.width;
+        canvas.height = v.height;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        page.render({canvasContext: context, viewport: v});
+        document.getElementById('cur-page').innerText = pageNum;
+        document.getElementById('param-page').innerText = pageNum;
+    });
+}
+document.getElementById('btn-prev').onclick = function() { goToPage(pageNum-1); };
+document.getElementById('btn-next').onclick = function() { goToPage(pageNum+1); };
+
+function updateSealImg() {
+    let sel = document.getElementById('seal_id');
+    let opt = sel.options[sel.selectedIndex];
+    let url = opt.getAttribute('data-path');
+    document.getElementById('seal-img').src = url;
+    document.getElementById('seal-img-preview').src = url;
+    document.getElementById('seal-draggable').style.display = '';
+}
+
+// 拖拽缩放旋转逻辑
+let seal = document.getElementById('seal-draggable');
+let sealImg = document.getElementById('seal-img');
+let rotateBtn = document.getElementById('rotate-btn');
+let dragging = false, offsetX = 0, offsetY = 0;
+let sealX = 40, sealY = 500, sealW = 120, sealH = 120, sealRot = 0;
+let rotating = false, rotateStartAngle = 0, rotateStartMouse = 0;
+
+seal.onmousedown = function(e) {
+    if(e.target === rotateBtn) return;
+    dragging = true;
+    offsetX = e.offsetX;
+    offsetY = e.offsetY;
+    document.body.style.userSelect = 'none';
+};
+document.onmousemove = function(e) {
+    if(dragging) {
+        let box = document.getElementById('pdf-canvas-box').getBoundingClientRect();
+        sealX = e.clientX - box.left - offsetX;
+        sealY = e.clientY - box.top - offsetY;
+        sealX = Math.max(0, Math.min(sealX, pdfWidth - sealW));
+        sealY = Math.max(0, Math.min(sealY, pdfHeight - sealH));
+        seal.style.left = sealX + 'px';
+        seal.style.top = sealY + 'px';
+        syncParams();
+    }
+};
+document.onmouseup = function(e) { dragging = false; document.body.style.userSelect = ''; };
+
+// 缩放（鼠标滚轮）
+seal.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    let delta = e.deltaY < 0 ? 1.05 : 0.95;
+    sealW = Math.max(40, Math.min(sealW * delta, pdfWidth));
+    sealH = Math.max(40, Math.min(sealH * delta, pdfHeight));
+    seal.style.width = sealW + 'px';
+    seal.style.height = sealH + 'px';
+    syncParams();
+});
+
+// 旋转（拖动旋转柄）
+rotateBtn.onmousedown = function(e) {
+    e.preventDefault();
+    rotating = true;
+    let box = seal.getBoundingClientRect();
+    let cx = box.left + sealW / 2;
+    let cy = box.top + sealH / 2;
+    rotateStartMouse = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
+    rotateStartAngle = sealRot;
+    document.body.style.userSelect = 'none';
+};
+document.addEventListener('mousemove', function(e) {
+    if(rotating) {
+        let box = seal.getBoundingClientRect();
+        let cx = box.left + sealW / 2;
+        let cy = box.top + sealH / 2;
+        let curMouse = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI;
+        let delta = curMouse - rotateStartMouse;
+        sealRot = (rotateStartAngle + delta + 360) % 360;
+        seal.style.transform = `rotate(${sealRot}deg)`;
+        syncParams();
+    }
+});
+document.addEventListener('mouseup', function(e) {
+    rotating = false;
+    document.body.style.userSelect = '';
+});
+
+// 缩放（输入框）
+document.getElementById('param-scale-input').oninput = function() {
+    let val = parseFloat(this.value);
+    if (isNaN(val)) return; // 允许输入小数点但不做限制，交由后端校验
+    if (val < 0.2) val = 0.2;
+    if (val > 2) val = 2;
+    sealW = 120 * val;
+    sealH = 120 * val;
+    seal.style.width = sealW + 'px';
+    seal.style.height = sealH + 'px';
+    syncParams();
+};
+
+function syncParams() {
+    let x = sealX;
+    let y = pdfHeight - sealY - sealH;
+    let scaleVal = sealW / pdfWidth;
+    document.getElementById('scale').value = scaleVal.toFixed(4);
+    document.getElementById('rotation').value = sealRot;
+    document.getElementById('param-x').innerText = x.toFixed(2);
+    document.getElementById('param-y').innerText = y.toFixed(2);
+    document.getElementById('param-w').innerText = sealW.toFixed(2);
+    document.getElementById('param-h').innerText = sealH.toFixed(2);
+    document.getElementById('param-rot').innerText = sealRot;
+    document.getElementById('param-scale-input').value = (sealW / 120.0).toFixed(2);
+    document.getElementById('page').value = pageNum;
+    document.getElementById('pos_x').value = x.toFixed(2);
+    document.getElementById('pos_y').value = y.toFixed(2);
+}
+
+// 文档/签章图片切换时重载
+function reloadAll() {
+    let docSel = document.getElementById('doc_id');
+    let docOpt = docSel.options[docSel.selectedIndex];
+    renderPDF(docOpt.getAttribute('data-path'));
+    updateSealImg(); // 切换文档或签章图片时自动恢复签章图片显示
+    sealX = 40; sealY = 500; sealW = 120; sealH = 120; sealRot = 0;
+    seal.style.left = sealX + 'px';
+    seal.style.top = sealY + 'px';
+    seal.style.width = sealW + 'px';
+    seal.style.height = sealH + 'px';
+    seal.style.transform = 'rotate(0deg)';
+    syncParams();
+}
+document.getElementById('doc_id').onchange = reloadAll;
+document.getElementById('seal_id').onchange = function() {
+    updateSealImg();
+    document.getElementById('seal-draggable').style.display = '';
+    reloadAll();
+};
+window.onload = reloadAll;
+
+// 表单AJAX提交，弹窗提示
+const signForm = document.getElementById('signForm');
+signForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(signForm);
+    fetch('/sign/pdf', {
+        method: 'POST',
+        body: formData
+    })
+    .then(async res => {
+        let data = null;
+        try {
+            data = await res.json();
+        } catch {
+            // 不是JSON，强制失败
+            return {success: false, msg: '签章失败，服务器响应异常'};
+        }
+        return data;
+    })
+    .then(data => {
+        // 只要有pdf_url就视为成功
+        if(data && data.pdf_url) {
+            alert(data.msg || '签章成功，已生成新PDF');
+            if(confirm('是否立即下载/预览PDF？')) {
+                window.open(data.pdf_url, '_blank');
+            }
+        } else if(data && data.success) {
+            alert(data.msg || '签章成功');
+        } else {
+            alert((data && data.msg) ? data.msg : '签章失败');
+        }
+    })
+    .catch(() => {
+        alert('签章失败，服务器无响应！');
+    });
+});
+</script>
 </body>
 </html>

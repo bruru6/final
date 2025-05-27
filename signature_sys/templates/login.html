@@ -3,14 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <title>用户登录</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            background: #f5f7fa;
+            font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+        }
+        .login-card {
+            background: #fff;
+            max-width: 400px;
+            margin: 90px auto 0 auto;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+            padding: 36px 32px 28px 32px;
+        }
+        .login-card h2 {
+            text-align: center;
+            color: #2d5be3;
+            margin-bottom: 28px;
+            font-weight: 600;
+        }
+        .login-card form {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .login-card input[type="text"],
+        .login-card input[type="password"] {
+            border: 1px solid #dbe2ef;
+            border-radius: 6px;
+            padding: 10px 12px;
+            background: #f8fafc;
+            font-size: 15px;
+        }
+        .login-card input[type="submit"] {
+            background: linear-gradient(90deg,#2d5be3 0%,#4f8cff 100%);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 0;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+            box-shadow: 0 2px 8px rgba(45,91,227,0.08);
+            transition: background 0.2s;
+        }
+        .login-card input[type="submit"]:hover {
+            background: linear-gradient(90deg,#1d3fa6 0%,#2d5be3 100%);
+        }
+        .login-card .register-link {
+            display: block;
+            text-align: right;
+            margin-top: 18px;
+            color: #2d5be3;
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.2s;
+        }
+        .login-card .register-link:hover {
+            color: #1d3fa6;
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
+<div class="login-card">
     <h2>用户登录</h2>
     <form method="post" action="/login">
-        用户名：<input type="text" name="username" required><br>
-        密码：<input type="password" name="password" required><br>
+        <input type="text" name="username" placeholder="用户名" required>
+        <input type="password" name="password" placeholder="密码" required>
         <input type="submit" value="登录">
     </form>
-    <a href="/register">没有账号？去注册</a>
+    <a class="register-link" href="/register">没有账号？去注册</a>
+</div>
 </body>
 </html>
