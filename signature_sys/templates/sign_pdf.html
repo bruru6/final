@@ -75,7 +75,7 @@
                         <label>选择签章图片：
                             <select name="seal_id" id="seal_id" required style="width:90%;">
                                 {{range .Seals}}
-                                <option value="{{.SealID}}" data-path="/{{.Location}}">{{.Location}}</option>
+                                <option value="{{.SealID}}" data-path="/{{.Location}}">{{.OriginalName}}</option>
                                 {{end}}
                             </select>
                         </label>

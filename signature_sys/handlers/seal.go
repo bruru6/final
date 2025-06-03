@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"html/template"
 	"io"
@@ -15,9 +16,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// handlers/seal.go
-// 本文件实现了签章图片相关的HTTP处理逻辑，包括签章图片上传、列表展示、删除等功能。
-// 涉及文件上传、哈希计算、数据库操作、用户认证等。
+// 实现签章图片相关的HTTP处理逻辑，包括签章图片上传、列表展示、删除等功能。
 
 // 签章图片上传页面和处理
 // GET: 渲染上传页面
@@ -38,7 +37,6 @@ func SealUploadHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer file.Close() // 关闭文件句柄
-
 		// 计算图片哈希
 		hasher := sha256.New()            // 新建SHA256哈希器
 		tee := io.TeeReader(file, hasher) // tee用于边读边哈希
@@ -55,16 +53,15 @@ func SealUploadHandler(w http.ResponseWriter, r *http.Request) {
 		defer out.Close()                              // 关闭输出文件
 		io.Copy(out, tee)                              // 写入图片并计算哈希
 		imgHash := hex.EncodeToString(hasher.Sum(nil)) // 获取图片哈希值
-
 		// 获取当前登录用户ID
 		userID, _ := middleware.GetCurrentUser(r)
 		if userID == "" {
 			// 如果用户未登录，返回401错误
-			http.Error(w, "请先登录", 401)
+			http.Error(w, "请先登录", http.StatusUnauthorized)
 			return
 		}
-		// 将签章信息写入数据库
-		_, err = config.DB.Exec("INSERT INTO [Seal] (SealID, UserID, ImageHash, Location) VALUES (@p1, @p2, @p3, @p4)", sealID, userID, imgHash, imgPath)
+		// 将签章信息写入数据库，增加OriginalName字段
+		_, err = config.DB.Exec("INSERT INTO [Seal] (SealID, UserID, ImageHash, Location, OriginalName) VALUES (@p1, @p2, @p3, @p4, @p5)", sealID, userID, imgHash, imgPath, header.Filename)
 		if err != nil {
 			// 如果数据库写入失败，返回500错误
 			http.Error(w, "数据库写入失败", 500)
@@ -86,8 +83,16 @@ func SealListHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	// 查询当前用户的签章图片信息
-	rows, err := config.DB.Query("SELECT SealID, ImageHash, Location FROM [Seal] WHERE UserID=@p1", userID)
+	// 获取搜索关键字
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	var rows *sql.Rows
+	var err error
+	if query != "" {
+		// 按原始文件名模糊查询
+		rows, err = config.DB.Query("SELECT SealID, ImageHash, Location, OriginalName FROM [Seal] WHERE UserID=@p1 AND OriginalName LIKE @p2", userID, "%"+query+"%")
+	} else {
+		rows, err = config.DB.Query("SELECT SealID, ImageHash, Location, OriginalName FROM [Seal] WHERE UserID=@p1", userID)
+	}
 	if err != nil {
 		// 如果数据库查询失败，返回500错误
 		http.Error(w, "数据库查询失败", 500)
@@ -95,26 +100,25 @@ func SealListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close() // 关闭结果集
 	var seals []struct {
-		SealID    string // 签章ID
-		ImageHash string // 图片哈希
-		Location  string // 图片路径
-		FileName  string // 图片文件名
+		SealID       string // 签章ID
+		ImageHash    string // 图片哈希
+		Location     string // 图片路径
+		OriginalName string // 原始文件名
 	}
 	for rows.Next() {
 		var s struct {
-			SealID    string
-			ImageHash string
-			Location  string
-			FileName  string
+			SealID       string
+			ImageHash    string
+			Location     string
+			OriginalName string
 		}
-		rows.Scan(&s.SealID, &s.ImageHash, &s.Location)
+		rows.Scan(&s.SealID, &s.ImageHash, &s.Location, &s.OriginalName)
 		s.Location = strings.ReplaceAll(s.Location, "\\", "/")
-		s.FileName = filepath.Base(s.Location) // 提取文件名
 		seals = append(seals, s)
 	}
-	// 渲染签章列表页面
+	// 渲染签章列表页面，带上当前搜索关键字
 	t, _ := template.ParseFiles("templates/seal_list.html")
-	t.Execute(w, map[string]interface{}{"Seals": seals})
+	t.Execute(w, map[string]interface{}{"Seals": seals, "Query": query})
 }
 
 // 删除签章图片
@@ -129,7 +133,7 @@ func SealDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method != http.MethodPost {
 		// 如果请求方法不是POST，返回405错误
-		http.Error(w, "仅支持POST", 405)
+		http.Error(w, "仅支持POST", http.StatusMethodNotAllowed)
 		return
 	}
 	// 获取签章ID

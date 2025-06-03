@@ -1,7 +1,3 @@
-// handlers/user.go
-// 本文件实现了用户相关的所有HTTP处理逻辑，包括注册、登录、登出、首页展示、PIN码设置等。
-// 涉及数据库操作、证书自动生成、JWT认证、会话管理等功能。
-
 package handlers
 
 import (

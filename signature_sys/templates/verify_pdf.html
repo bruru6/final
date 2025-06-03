@@ -65,13 +65,14 @@
 <body>
 <div class="container">
     <h2>PDF验签</h2>
-    <form id="verifyForm" enctype="multipart/form-data">
-        <label>
+    <form id="verifyForm" enctype="multipart/form-data" style="margin-bottom:18px;">
+        <label style="margin-bottom:12px;">
             上传待验证PDF：
-            <input type="file" name="pdf" required>
+            <input type="file" name="pdf" required style="width:96%;margin-top:6px;">
         </label>
-        <label>选择证书：
-            <select name="cert_id" id="cert_id" required style="width:90%;">
+        <label style="margin-bottom:12px;">
+            选择证书：
+            <select name="cert_id" id="cert_id" required style="width:100%;margin-top:6px;">
                 {{range .Certs}}
                 <option value="{{.CertID}}" data-path="/{{.Location}}" data-algo="{{.Algo}}">{{.Algo}}</option>
                 {{end}}

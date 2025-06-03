@@ -16,7 +16,10 @@
 <body>
 <div class="doc-list-box">
     <h2>我的PDF文档</h2>
-    <input type="text" id="docSearchInput" placeholder="搜索文档路径..." style="width:60%;margin:10px auto 0;display:block;padding:8px 12px;border:1px solid #eee;border-radius:6px;">
+    <form method="get" action="/document/list" style="display:flex;justify-content:center;align-items:center;margin-bottom:0;">
+        <input type="text" id="docSearchInput" name="q" value="{{.Query}}" placeholder="搜索文档..." style="width:60%;padding:8px 12px;border:1px solid #eee;border-radius:6px;">
+        <input type="submit" value="搜索" style="margin-left:8px;">
+    </form>
     <table>
         <thead>
             <tr>
@@ -27,7 +30,7 @@
         <tbody id="docTableBody">
         {{range .Docs}}
             <tr>
-                <td>{{.OriginalName}}</td>
+                <td class="doc-location">{{.OriginalName}}</td>
                 <td>
                     <form method="post" action="/document/delete" style="display:inline;">
                         <input type="hidden" name="doc_id" value="{{.DocID}}">
@@ -42,20 +45,5 @@
     </table>
     <a class="back-link" href="/">返回首页</a>
 </div>
-<script>
-// 文档列表搜索功能
-const docSearchInput = document.getElementById('docSearchInput');
-const docTableBody = document.getElementById('docTableBody');
-docSearchInput && docSearchInput.addEventListener('input', function() {
-    const keyword = this.value.trim().toLowerCase();
-    const rows = docTableBody.querySelectorAll('tr');
-    rows.forEach(row => {
-        const locationDiv = row.querySelector('.doc-location');
-        if (!locationDiv) return; // 跳过“暂无”行
-        const text = locationDiv.textContent.toLowerCase();
-        row.style.display = text.includes(keyword) ? '' : 'none';
-    });
-});
-</script>
 </body>
 </html>

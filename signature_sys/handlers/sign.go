@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -20,8 +21,7 @@ import (
 	"github.com/pdfcpu/pdfcpu/pkg/pdfcpu/model"
 )
 
-// 实现了PDF签章相关的HTTP处理逻辑，包括签章页面、签章处理、证书/签章/文档选择等。
-// 涉及PDF水印、签名算法、参数校验、数据库操作、路径处理、前后端JSON通信等。
+// 实现PDF签章相关的HTTP处理逻辑，包括签章页面、签章处理、证书/签章/文档选择等。
 
 // 签章页面（表单）
 // 展示当前用户所有文档、签章图片、证书，渲染签章表单
@@ -42,12 +42,12 @@ func SignPDFPageHandler(w http.ResponseWriter, r *http.Request) {
 		docs = append(docs, d)
 	}
 	docsRows.Close()
-	// 查询用户签章图片
-	sealsRows, _ := config.DB.Query("SELECT SealID, Location FROM [Seal] WHERE UserID=@p1", userID)
-	var seals []struct{ SealID, Location string }
+	// 查询用户签章图片，带OriginalName
+	sealsRows, _ := config.DB.Query("SELECT SealID, Location, OriginalName FROM [Seal] WHERE UserID=@p1", userID)
+	var seals []struct{ SealID, Location, OriginalName string }
 	for sealsRows.Next() {
-		var s struct{ SealID, Location string }
-		sealsRows.Scan(&s.SealID, &s.Location)
+		var s struct{ SealID, Location, OriginalName string }
+		sealsRows.Scan(&s.SealID, &s.Location, &s.OriginalName)
 		seals = append(seals, s)
 	}
 	sealsRows.Close()
@@ -91,9 +91,6 @@ func SignPDFHandler(w http.ResponseWriter, r *http.Request) {
 	page := r.FormValue("page")         // 页码
 	posX := r.FormValue("pos_x")        // X坐标
 	posY := r.FormValue("pos_y")        // Y坐标
-
-	// fmt.Printf("[SignPDFHandler] docID=%s, sealID=%s, scale=%s, rotation=%s, certID=%s, pin=%s, page=%s, posX=%s, posY=%s\n", docID, sealID, scale, rotation, certID, pin, page, posX, posY)
-
 	// 校验PIN码
 	var pinHash string
 	err := config.DB.QueryRow("SELECT PINHash FROM [User] WHERE UserID=@p1", userID).Scan(&pinHash)
@@ -134,14 +131,16 @@ func SignPDFHandler(w http.ResponseWriter, r *http.Request) {
 	if preview {
 		outputPath = pdfPath + ".preview.pdf"
 	} else {
-		outputPath = pdfPath + "img.pdf"
+		outputPath = pdfPath[:len(certPath)-4] + "+img.pdf"
 	}
 	// 解析参数
 	s, _ := strconv.ParseFloat(scale, 64)     // 缩放比例
 	rf, _ := strconv.ParseFloat(rotation, 64) // 旋转角度
-	pageNum := page                           // 页码
-	x, _ := strconv.ParseFloat(posX, 64)      // X坐标
-	y, _ := strconv.ParseFloat(posY, 64)      // Y坐标
+	// 归一化旋转角度到 -180~180
+	rf = math.Mod(rf+180, 360) - 180
+	pageNum := page                      // 页码
+	x, _ := strconv.ParseFloat(posX, 64) // X坐标
+	y, _ := strconv.ParseFloat(posY, 64) // Y坐标
 	// 构造水印参数，使用相对位置，offset 用空格分隔两个数值
 	wmParam := fmt.Sprintf("pos:bl,offset:%d %d,scale:%.2f,rot:%.2f", int(x), int(y), s, rf)
 	conf := model.NewDefaultConfiguration()
@@ -166,10 +165,9 @@ func SignPDFHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"preview":"/%s"}`, outputPath)
 		return
 	}
-
 	// ----------- PDF签名域定义（签名前必须有签名域） --------------
 	// 生成带签名域的PDF，供后续数字签名使用
-	withFieldPath := outputPath[:len(certPath)-7] + "addfield.pdf"
+	withFieldPath := outputPath[:len(certPath)-8] + "+addfield.pdf"
 	sigFieldName := "Signature1" // 签名域名称，可自定义
 	// 读取印章图片宽高（像素），如需可用于签名域定位
 	sealFile, err := os.Open(sealPath)
@@ -178,8 +176,6 @@ func SignPDFHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"success":false,"msg":"无法打开印章图片: %s"}`, err.Error())
 		return
 	}
-	// 可选：解析图片尺寸（如需精确定位签名域）
-	// imgCfg, _, err := image.DecodeConfig(sealFile)
 	sealFile.Close()
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -200,10 +196,9 @@ func SignPDFHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	outputPath = withFieldPath
-
 	// ----------- PDF数字签名（标准PDF签名，写入PDF结构） --------------
 	privPath := certPath[:len(certPath)-4] + "_private.pem"
-	signedPath := outputPath[:len(certPath)-12] + ".signed.pdf"
+	signedPath := outputPath[:len(certPath)-13] + "SIGNED.pdf"
 	cmd := exec.Command(
 		"pyhanko", "sign", "addsig", "pemder",
 		"--cert", certPath,
@@ -211,7 +206,6 @@ func SignPDFHandler(w http.ResponseWriter, r *http.Request) {
 		"--no-pass",
 		outputPath, signedPath,
 	)
-
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -219,7 +213,6 @@ func SignPDFHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"success":false,"msg":"PDF数字签名失败: %s, %s"}`, err.Error(), string(out))
 		return
 	}
-
 	// 计算签名后PDF的哈希
 	pdfFile, err := os.Open(signedPath)
 	if err != nil {
@@ -241,15 +234,21 @@ func SignPDFHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"success":false,"msg":"更新文档哈希失败"}`)
 		return
 	}
-
-	// 写入签章日志（不存储签名值）
+	// 写入签章日志
+	rotationInt := int(rf) + 180
+	fmt.Printf("[SignPDFHandler] SQL: %s\n", `INSERT INTO SignLog 
+    (UserID, DocID, SealID, CertID, SignAlgorithm, SignatureValue, PositionX, PositionY, Scale, Rotation, SignTime) 
+    VALUES (@p1, @p2, @p3, @p4, @p5, NULL, @p6, @p7, @p8, @p9, GETDATE())`)
+	fmt.Printf("[SignPDFHandler] PARAMS: userID=%v, docID=%v, sealID=%v, certID=%v, SignAlgorithm=%v, x=%v, y=%v, s=%v, rf=%v\n",
+		userID, docID, sealID, certID, "pyHanko", x, y, s, rotationInt)
 	_, err = config.DB.Exec(`INSERT INTO SignLog 
-    	(UserID, DocID, SealID, CertID, SignAlgorithm, SignatureValue, PositionX, PositionY, Scale, Rotation, SignTime) 
-    	VALUES (@p1, @p2, @p3, @p4, @p5, NULL, @p6, @p7, @p8, @p9, GETDATE())`,
-		userID, docID, sealID, certID, "pyHanko", x, y, s, int(rf))
+    (UserID, DocID, SealID, CertID, SignAlgorithm, SignatureValue, PositionX, PositionY, Scale, Rotation, SignTime) 
+    VALUES (@p1, @p2, @p3, @p4, @p5, NULL, @p6, @p7, @p8, @p9, GETDATE())`,
+		userID, docID, sealID, certID, "pyHanko", x, y, s, rotationInt)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"success":false,"msg":"签章日志写入失败"}`)
+		fmt.Printf("[SignPDFHandler] 签章日志写入失败: %v\n", err)
+		fmt.Fprintf(w, `{"success":false,"msg":"签章日志写入失败: %s"}`, err.Error())
 		return
 	}
 	// 返回成功响应，始终返回JSON格式

@@ -17,7 +17,10 @@
 <body>
 <div class="seal-list-box">
     <h2>我的签章图片</h2>
-    <input type="text" id="sealSearchInput" placeholder="搜索图片路径..." style="width:60%;margin:10px auto 0;display:block;padding:8px 12px;border:1px solid #eee;border-radius:6px;">
+    <form method="get" action="/seal/list" style="display:flex;justify-content:center;align-items:center;margin-bottom:0;">
+        <input type="text" id="sealSearchInput" name="q" value="{{.Query}}" placeholder="搜索图片原名..." style="width:60%;padding:8px 12px;border:1px solid #eee;border-radius:6px;">
+        <input type="submit" value="搜索" style="margin-left:8px;">
+    </form>
     <table>
         <thead>
             <tr>
@@ -28,7 +31,7 @@
         <tbody id="sealTableBody">
         {{range .Seals}}
             <tr>
-                <td><img src="/{{.Location}}" alt="seal"><div class="seal-location" style="font-size:13px;color:#888;margin-top:4px;">{{.FileName}}</div></td>
+                <td><img src="/{{.Location}}" alt="seal"><div class="seal-location" style="font-size:13px;color:#888;margin-top:4px;">{{.OriginalName}}</div></td>
                 <td>
                     <form method="post" action="/seal/delete" style="display:inline;">
                         <input type="hidden" name="seal_id" value="{{.SealID}}">
@@ -44,19 +47,6 @@
     <a class="back-link" href="/">返回首页</a>
 </div>
 <script>
-// 签章图片列表搜索功能
-const sealSearchInput = document.getElementById('sealSearchInput');
-const sealTableBody = document.getElementById('sealTableBody');
-sealSearchInput && sealSearchInput.addEventListener('input', function() {
-    const keyword = this.value.trim().toLowerCase();
-    const rows = sealTableBody.querySelectorAll('tr');
-    rows.forEach(row => {
-        const locationDiv = row.querySelector('.seal-location');
-        if (!locationDiv) return; // 跳过“暂无”行
-        const text = locationDiv.textContent.toLowerCase();
-        row.style.display = text.includes(keyword) ? '' : 'none';
-    });
-});
 </script>
 </body>
 </html>
